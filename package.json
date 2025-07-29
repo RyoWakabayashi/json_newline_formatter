@@ -1,8 +1,21 @@
 {
   "name": "json-newline-formatter",
   "displayName": "JSON Newline Formatter",
-  "description": "Display \\n escape sequences as actual line breaks in JSON files",
+  "description": "Display \\n escape sequences as actual line breaks in JSON files for better readability",
   "version": "0.0.1",
+  "publisher": "your-publisher-name",
+  "author": {
+    "name": "Your Name"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/json-newline-formatter.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-username/json-newline-formatter/issues"
+  },
+  "homepage": "https://github.com/your-username/json-newline-formatter#readme",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -14,7 +27,11 @@
     "json",
     "formatter",
     "newline",
-    "escape sequences"
+    "escape sequences",
+    "readability",
+    "visualization",
+    "editor",
+    "decoration"
   ],
   "activationEvents": [
     "onLanguage:json",
@@ -26,7 +43,8 @@
       {
         "command": "json-newline-formatter.toggle",
         "title": "Toggle JSON Newline Formatting",
-        "category": "JSON Formatter"
+        "category": "JSON Formatter",
+        "icon": "$(symbol-string)"
       }
     ],
     "keybindings": [
@@ -36,7 +54,37 @@
         "mac": "cmd+shift+j",
         "when": "editorTextFocus && (resourceExtname == .json || resourceExtname == .jsonc)"
       }
-    ]
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "json-newline-formatter.toggle",
+          "when": "resourceExtname == .json || resourceExtname == .jsonc",
+          "group": "1_modification"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "json-newline-formatter.toggle",
+          "when": "resourceExtname == .json || resourceExtname == .jsonc"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "JSON Newline Formatter",
+      "properties": {
+        "json-newline-formatter.enableOnStartup": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable JSON newline formatting when opening JSON files"
+        },
+        "json-newline-formatter.showStatusBar": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show status bar indicator for JSON newline formatting"
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
@@ -44,7 +92,13 @@
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src --ext ts",
-    "test": "node ./out/test/runTest.js"
+    "test": "node ./out/test/runTest.js",
+    "package": "vsce package",
+    "publish": "vsce publish"
+  },
+  "galleryBanner": {
+    "color": "#1e1e1e",
+    "theme": "dark"
   },
   "devDependencies": {
     "@types/glob": "^8.1.0",
@@ -54,6 +108,7 @@
     "@typescript-eslint/eslint-plugin": "^5.45.0",
     "@typescript-eslint/parser": "^5.45.0",
     "@vscode/test-electron": "^2.2.0",
+    "@vscode/vsce": "^2.15.0",
     "eslint": "^8.28.0",
     "glob": "^11.0.3",
     "mocha": "^11.7.1",

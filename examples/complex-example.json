@@ -1,0 +1,54 @@
+{
+  "apiResponses": {
+    "errorMessages": {
+      "validation": "Validation failed:\\nThe following fields are required:\\n- username\\n- email\\n- password\\n\\nPlease correct these errors and try again.",
+      "authentication": "Authentication failed:\\nInvalid credentials provided.\\n\\nPlease check your username and password\\nand try again.",
+      "authorization": "Access denied:\\nYou do not have permission to access this resource.\\n\\nContact your administrator if you believe\\nthis is an error."
+    },
+    "successMessages": {
+      "userCreated": "User account created successfully!\\n\\nWelcome to our platform.\\nYou can now log in with your credentials.",
+      "dataImported": "Data import completed:\\n\\n- 1,250 records processed\\n- 1,200 records imported successfully\\n- 50 records skipped due to validation errors\\n\\nImport summary available in your dashboard."
+    }
+  },
+  "templates": {
+    "emailTemplates": {
+      "welcome": {
+        "subject": "Welcome to Our Platform!",
+        "body": "Dear {{username}},\\n\\nWelcome to our platform!\\n\\nWe're excited to have you on board.\\nHere are some quick tips to get started:\\n\\n1. Complete your profile\\n2. Explore our features\\n3. Join our community\\n\\nIf you have any questions, don't hesitate\\nto reach out to our support team.\\n\\nBest regards,\\nThe Team"
+      },
+      "passwordReset": {
+        "subject": "Password Reset Request",
+        "body": "Hello {{username}},\\n\\nWe received a request to reset your password.\\n\\nIf you made this request, click the link below:\\n{{resetLink}}\\n\\nIf you didn't request this, please ignore\\nthis email. Your password will remain unchanged.\\n\\nThis link will expire in 24 hours.\\n\\nSecurity Team"
+      }
+    }
+  },
+  "codeSnippets": {
+    "javascript": {
+      "function": "function processData(input) {\\n  if (!input) {\\n    throw new Error('Input is required');\\n  }\\n  \\n  const result = input\\n    .split('\\\\n')\\n    .map(line => line.trim())\\n    .filter(line => line.length > 0);\\n  \\n  return result;\\n}",
+      "class": "class DataProcessor {\\n  constructor(options = {}) {\\n    this.options = {\\n      delimiter: '\\\\n',\\n      trimLines: true,\\n      ...options\\n    };\\n  }\\n  \\n  process(data) {\\n    return data\\n      .split(this.options.delimiter)\\n      .map(line => this.options.trimLines ? line.trim() : line);\\n  }\\n}"
+    },
+    "sql": {
+      "createTable": "CREATE TABLE users (\\n  id SERIAL PRIMARY KEY,\\n  username VARCHAR(50) UNIQUE NOT NULL,\\n  email VARCHAR(100) UNIQUE NOT NULL,\\n  password_hash VARCHAR(255) NOT NULL,\\n  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\\n  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\\n);",
+      "selectQuery": "SELECT \\n  u.id,\\n  u.username,\\n  u.email,\\n  p.title as profile_title,\\n  p.bio\\nFROM users u\\nLEFT JOIN profiles p ON u.id = p.user_id\\nWHERE u.active = true\\nORDER BY u.created_at DESC\\nLIMIT 10;"
+    }
+  },
+  "logs": {
+    "applicationLogs": [
+      {
+        "timestamp": "2024-01-15T10:30:00Z",
+        "level": "INFO",
+        "message": "Application started successfully\\nListening on port 3000\\nEnvironment: production"
+      },
+      {
+        "timestamp": "2024-01-15T10:35:00Z",
+        "level": "ERROR",
+        "message": "Database connection failed\\nError: Connection timeout\\nRetrying in 5 seconds...\\n\\nStack trace:\\n  at DatabaseConnector.connect()\\n  at Application.start()\\n  at main()"
+      },
+      {
+        "timestamp": "2024-01-15T10:35:05Z",
+        "level": "INFO",
+        "message": "Database connection restored\\nConnection pool initialized\\nReady to accept requests"
+      }
+    ]
+  }
+}

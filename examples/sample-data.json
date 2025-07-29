@@ -1,0 +1,33 @@
+{
+  "user": {
+    "name": "John Doe",
+    "bio": "Software developer\\nPassionate about clean code\\nLoves working with JSON files",
+    "address": "123 Main Street\\nAnytown, ST 12345\\nUnited States"
+  },
+  "messages": [
+    {
+      "id": 1,
+      "content": "Hello there!\\nHow are you doing today?\\nI hope everything is going well.",
+      "timestamp": "2024-01-15T10:30:00Z"
+    },
+    {
+      "id": 2,
+      "content": "This is a multi-line message\\nwith several lines of text\\nthat demonstrates the extension's\\nformatting capabilities.",
+      "timestamp": "2024-01-15T11:45:00Z"
+    }
+  ],
+  "configuration": {
+    "database": {
+      "connectionString": "Server=localhost;\\nDatabase=myapp;\\nUser Id=admin;\\nPassword=secret123;",
+      "options": "Timeout=30;\\nRetry=3;\\nSSL=true;"
+    },
+    "logging": {
+      "format": "[{timestamp}] {level}: {message}\\n{exception}",
+      "levels": "DEBUG\\nINFO\\nWARN\\nERROR\\nFATAL"
+    }
+  },
+  "documentation": {
+    "readme": "# My Project\\n\\nThis is a sample project that demonstrates\\nhow to work with JSON files containing\\nnewline characters.\\n\\n## Features\\n\\n- Feature 1\\n- Feature 2\\n- Feature 3\\n\\n## Installation\\n\\n1. Step one\\n2. Step two\\n3. Step three",
+    "changelog": "## Version 1.0.0\\n\\n### Added\\n- Initial release\\n- Basic functionality\\n\\n### Fixed\\n- Bug fixes\\n\\n### Changed\\n- Improved performance"
+  }
+}

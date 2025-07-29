@@ -114,19 +114,35 @@ export class EditSynchronizer {
             return;
         }
 
-        // Initialize document state if not exists
-        this.ensureDocumentState(document);
+        try {
+            // Check if JSON is valid before processing changes
+            const parseResult = this.jsonDetector.parseJsonSafely(document);
+            
+            if (!parseResult.isValid) {
+                // JSON is invalid, skip edit synchronization to avoid further corruption
+                console.log('EditSynchronizer: Skipping edit synchronization for invalid JSON');
+                return;
+            }
 
-        // Process each content change
-        for (const change of event.contentChanges) {
-            this.processContentChange(document, change);
+            // Initialize document state if not exists
+            this.ensureDocumentState(document);
+
+            // Process each content change
+            for (const change of event.contentChanges) {
+                this.processContentChange(document, change);
+            }
+
+            // Update document state
+            this.updateDocumentState(document);
+
+            // Update decorations after processing changes
+            this.decorationManager.updateDecorations(event);
+            
+        } catch (error) {
+            console.error('EditSynchronizer: Error processing document changes', error);
+            // Don't show user notification for every edit error to avoid spam
+            // The JsonStringDetector will handle user notifications for parsing errors
         }
-
-        // Update document state
-        this.updateDocumentState(document);
-
-        // Update decorations after processing changes
-        this.decorationManager.updateDecorations(event);
     }
 
     /**
@@ -135,20 +151,25 @@ export class EditSynchronizer {
      * @param change The specific content change
      */
     private processContentChange(document: vscode.TextDocument, change: vscode.TextDocumentContentChangeEvent): void {
-        const changeRange = change.range;
-        const newText = change.text;
+        try {
+            const changeRange = change.range;
+            const newText = change.text;
 
-        // Check if the change is within a decorated string area
-        const affectedDecorations = this.decorationManager.getDecorationsInRange(changeRange);
-        
-        if (affectedDecorations.length > 0) {
-            // This change affects decorated content, handle synchronization
-            this.handleDecoratedAreaEdit(document, change);
-        } else {
-            // Check if the change introduces new newlines that need decoration
-            if (newText.includes('\\n')) {
-                this.handleNewlineInsertion(document, change);
+            // Check if the change is within a decorated string area
+            const affectedDecorations = this.decorationManager.getDecorationsInRange(changeRange);
+            
+            if (affectedDecorations.length > 0) {
+                // This change affects decorated content, handle synchronization
+                this.handleDecoratedAreaEdit(document, change);
+            } else {
+                // Check if the change introduces new newlines that need decoration
+                if (newText.includes('\\n')) {
+                    this.handleNewlineInsertion(document, change);
+                }
             }
+        } catch (error) {
+            console.warn('EditSynchronizer: Error processing content change', error);
+            // Continue processing other changes even if one fails
         }
     }
 
@@ -469,11 +490,28 @@ export class EditSynchronizer {
      */
     private validateDocumentConsistency(document: vscode.TextDocument): void {
         try {
-            // Try to parse the JSON to ensure it's still valid
-            JSON.parse(document.getText());
+            // Use the safe JSON parsing method
+            const parseResult = this.jsonDetector.parseJsonSafely(document);
+            
+            if (!parseResult.isValid) {
+                console.warn('EditSynchronizer: Document contains invalid JSON after edits', parseResult.error);
+                
+                // Show warning to user about JSON validity
+                vscode.window.showWarningMessage(
+                    'JSON Newline Formatter: The document contains invalid JSON. Some features may not work correctly.',
+                    'Show Details'
+                ).then(selection => {
+                    if (selection === 'Show Details' && parseResult.errorPosition) {
+                        const editor = vscode.window.activeTextEditor;
+                        if (editor && editor.document === document) {
+                            editor.selection = new vscode.Selection(parseResult.errorPosition, parseResult.errorPosition);
+                            editor.revealRange(new vscode.Range(parseResult.errorPosition, parseResult.errorPosition));
+                        }
+                    }
+                });
+            }
         } catch (error) {
-            console.warn('EditSynchronizer: Document contains invalid JSON after edits', error);
-            // Could show a warning to the user here
+            console.error('EditSynchronizer: Error validating document consistency', error);
         }
     }
 

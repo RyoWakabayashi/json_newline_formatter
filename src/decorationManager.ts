@@ -83,55 +83,76 @@ export class DecorationManager {
         // Clear existing decorations
         this.clearDecorations();
 
-        // Find all newline positions in the document
-        const newlinePositions = this.jsonDetector.getDetailedNewlinePositions(document);
-        
-        // Create decorations for each newline position
-        const hideDecorationOptions: vscode.DecorationOptions[] = [];
-        const lineBreakDecorationOptions: vscode.DecorationOptions[] = [];
-        this.currentDecorations = [];
-
-        for (const newlinePos of newlinePositions) {
-            const decoration = this.createDecorationForNewline(document, newlinePos);
-            if (decoration) {
-                this.currentDecorations.push(decoration);
-                
-                // Create decoration to hide the \n sequence
-                const hideOption: vscode.DecorationOptions = {
-                    range: decoration.range,
-                    hoverMessage: 'Formatted \\n escape sequence (hidden)'
-                };
-                hideDecorationOptions.push(hideOption);
-                
-                // Create decoration to add visual line break after the \n sequence
-                const lineBreakRange = new vscode.Range(
-                    newlinePos.endPosition,
-                    newlinePos.endPosition
-                );
-                
-                const lineBreakOption: vscode.DecorationOptions = {
-                    range: lineBreakRange,
-                    renderOptions: {
-                        after: {
-                            contentText: '\n',
-                            // Style the line break to be invisible but functional
-                            color: 'transparent',
-                            backgroundColor: 'transparent',
-                            // Ensure proper line break rendering
-                            fontStyle: 'normal',
-                            fontWeight: 'normal',
-                            textDecoration: 'none'
-                        }
-                    },
-                    hoverMessage: 'Visual line break for \\n sequence'
-                };
-                lineBreakDecorationOptions.push(lineBreakOption);
+        try {
+            // Check if JSON is valid before proceeding
+            const parseResult = this.jsonDetector.parseJsonSafely(document);
+            
+            if (!parseResult.isValid) {
+                // JSON is invalid, don't apply decorations
+                console.log('DecorationManager: Skipping decorations for invalid JSON');
+                return;
             }
-        }
 
-        // Apply both decoration types
-        editor.setDecorations(this.decorationType, hideDecorationOptions);
-        editor.setDecorations(this.lineBreakDecorationType, lineBreakDecorationOptions);
+            // Find all newline positions in the document
+            const newlinePositions = this.jsonDetector.getDetailedNewlinePositions(document);
+            
+            // Create decorations for each newline position
+            const hideDecorationOptions: vscode.DecorationOptions[] = [];
+            const lineBreakDecorationOptions: vscode.DecorationOptions[] = [];
+            this.currentDecorations = [];
+
+            for (const newlinePos of newlinePositions) {
+                const decoration = this.createDecorationForNewline(document, newlinePos);
+                if (decoration) {
+                    this.currentDecorations.push(decoration);
+                    
+                    // Create decoration to hide the \n sequence
+                    const hideOption: vscode.DecorationOptions = {
+                        range: decoration.range,
+                        hoverMessage: 'Formatted \\n escape sequence (hidden)'
+                    };
+                    hideDecorationOptions.push(hideOption);
+                    
+                    // Create decoration to add visual line break after the \n sequence
+                    const lineBreakRange = new vscode.Range(
+                        newlinePos.endPosition,
+                        newlinePos.endPosition
+                    );
+                    
+                    const lineBreakOption: vscode.DecorationOptions = {
+                        range: lineBreakRange,
+                        renderOptions: {
+                            after: {
+                                contentText: '\n',
+                                // Style the line break to be invisible but functional
+                                color: 'transparent',
+                                backgroundColor: 'transparent',
+                                // Ensure proper line break rendering
+                                fontStyle: 'normal',
+                                fontWeight: 'normal',
+                                textDecoration: 'none'
+                            }
+                        },
+                        hoverMessage: 'Visual line break for \\n sequence'
+                    };
+                    lineBreakDecorationOptions.push(lineBreakOption);
+                }
+            }
+
+            // Apply both decoration types
+            editor.setDecorations(this.decorationType, hideDecorationOptions);
+            editor.setDecorations(this.lineBreakDecorationType, lineBreakDecorationOptions);
+            
+        } catch (error) {
+            console.error('DecorationManager: Error applying decorations', error);
+            // Clear decorations on error to prevent inconsistent state
+            this.clearDecorations();
+            
+            // Notify user of decoration error
+            vscode.window.showWarningMessage(
+                'JSON Newline Formatter: Unable to apply formatting due to an error. Check the JSON syntax.'
+            );
+        }
     }
 
     /**

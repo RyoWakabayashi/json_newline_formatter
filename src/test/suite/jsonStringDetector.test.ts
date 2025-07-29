@@ -9,6 +9,21 @@ suite('JsonStringDetector Test Suite', () => {
         detector = new JsonStringDetector();
     });
 
+    suite('Core Functionality Tests', () => {
+        test('should initialize correctly', () => {
+            assert.ok(detector instanceof JsonStringDetector, 'Should create JsonStringDetector instance');
+            assert.strictEqual(typeof detector.containsNewlines, 'function', 'Should have containsNewlines method');
+            assert.strictEqual(typeof detector.findStringRanges, 'function', 'Should have findStringRanges method');
+            assert.strictEqual(typeof detector.extractNewlinePositions, 'function', 'Should have extractNewlinePositions method');
+        });
+
+        test('should handle null and undefined inputs gracefully', () => {
+            assert.strictEqual(detector.containsNewlines(''), false, 'Should handle empty string');
+            assert.strictEqual(detector.containsNewlines(null as any), false, 'Should handle null input');
+            assert.strictEqual(detector.containsNewlines(undefined as any), false, 'Should handle undefined input');
+        });
+    });
+
     suite('containsNewlines', () => {
         test('should return true for strings with \\n', () => {
             assert.strictEqual(detector.containsNewlines('Hello\\nWorld'), true);
@@ -29,6 +44,24 @@ suite('JsonStringDetector Test Suite', () => {
             assert.strictEqual(detector.containsNewlines('n\\\\n'), false); // n + escaped backslash + n
             assert.strictEqual(detector.containsNewlines('\\n\\\\n'), true); // Has actual \\n
             assert.strictEqual(detector.containsNewlines('\\\\\\n'), true); // Escaped backslash + actual \n
+        });
+
+        test('should handle complex escape sequence patterns', () => {
+            assert.strictEqual(detector.containsNewlines('\\\\\\\\n'), false); // Four backslashes + n
+            assert.strictEqual(detector.containsNewlines('\\\\\\\\\\n'), true); // Four backslashes + actual \n
+            assert.strictEqual(detector.containsNewlines('text\\nmore\\\\nend'), true); // Mixed patterns
+            assert.strictEqual(detector.containsNewlines('\\t\\r\\n\\b\\f'), true); // Mixed with actual \n
+            assert.strictEqual(detector.containsNewlines('\\t\\r\\\\n\\b\\f'), false); // Mixed without actual \n
+        });
+
+        test('should handle performance with long strings', () => {
+            const longString = 'a'.repeat(10000) + '\\n' + 'b'.repeat(10000);
+            const startTime = Date.now();
+            const result = detector.containsNewlines(longString);
+            const endTime = Date.now();
+            
+            assert.strictEqual(result, true);
+            assert.ok(endTime - startTime < 100, 'Should process long strings quickly');
         });
     });
 
@@ -165,6 +198,95 @@ suite('JsonStringDetector Test Suite', () => {
                 assert.strictEqual(range.hasNewlines, false);
             });
         });
+
+        test('should handle complex nested JSON with various data types', async () => {
+            const content = `{
+                "metadata": {
+                    "version": "1.0",
+                    "description": "Test\\nDescription\\nWith\\nMultiple\\nLines"
+                },
+                "data": [
+                    {
+                        "id": 1,
+                        "name": "Item 1",
+                        "content": "First item\\nwith content"
+                    },
+                    {
+                        "id": 2,
+                        "name": "Item 2",
+                        "content": "Second item\\nwith more\\ncontent"
+                    }
+                ],
+                "config": {
+                    "enabled": true,
+                    "timeout": 5000,
+                    "message": "Configuration\\nmessage"
+                }
+            }`;
+            const document = await createTestDocument(content);
+            
+            const ranges = detector.findStringRanges(document);
+            
+            // Count strings with newlines
+            const withNewlines = ranges.filter(r => r.hasNewlines);
+            assert.strictEqual(withNewlines.length, 4); // description, content1, content2, message
+            
+            // Verify specific content
+            const descriptionRange = ranges.find(r => r.content.includes('Test\\nDescription'));
+            assert.ok(descriptionRange, 'Should find description with newlines');
+            assert.strictEqual(descriptionRange!.hasNewlines, true);
+        });
+
+        test('should handle JSON with Unicode and special characters', async () => {
+            const content = '{"unicode": "Hello\\n世界\\nWorld", "emoji": "Test\\n😀\\n🌟"}';
+            const document = await createTestDocument(content);
+            
+            const ranges = detector.findStringRanges(document);
+            
+            assert.strictEqual(ranges.length, 4); // 2 keys + 2 values
+            
+            const withNewlines = ranges.filter(r => r.hasNewlines);
+            assert.strictEqual(withNewlines.length, 2);
+            
+            // Verify Unicode handling
+            const unicodeRange = ranges.find(r => r.content.includes('世界'));
+            assert.ok(unicodeRange, 'Should handle Unicode characters');
+            assert.strictEqual(unicodeRange!.hasNewlines, true);
+        });
+
+        test('should handle JSON with very long strings', async () => {
+            const longContent = 'A'.repeat(1000) + '\\n' + 'B'.repeat(1000);
+            const content = `{"longString": "${longContent}"}`;
+            const document = await createTestDocument(content);
+            
+            const ranges = detector.findStringRanges(document);
+            
+            assert.strictEqual(ranges.length, 2); // key + value
+            
+            const longStringRange = ranges.find(r => r.content.length > 1000);
+            assert.ok(longStringRange, 'Should find long string');
+            assert.strictEqual(longStringRange!.hasNewlines, true);
+        });
+
+        test('should handle JSON with null and empty values', async () => {
+            const content = `{
+                "nullValue": null,
+                "emptyString": "",
+                "emptyObject": {},
+                "emptyArray": [],
+                "stringWithNewline": "Not empty\\nwith newline"
+            }`;
+            const document = await createTestDocument(content);
+            
+            const ranges = detector.findStringRanges(document);
+            
+            // Should find all string keys plus the two string values
+            assert.strictEqual(ranges.length, 7); // 5 keys + 2 string values
+            
+            const withNewlines = ranges.filter(r => r.hasNewlines);
+            assert.strictEqual(withNewlines.length, 1);
+            assert.strictEqual(withNewlines[0].content, 'Not empty\\nwith newline');
+        });
     });
 
     suite('extractNewlinePositions', () => {
@@ -291,6 +413,114 @@ suite('JsonStringDetector Test Suite', () => {
             const range = detector.getStringRangeAtPosition(document, position);
             
             assert.strictEqual(range, null);
+        });
+    });
+
+    suite('Advanced JSON Parsing', () => {
+        async function createTestDocument(content: string): Promise<vscode.TextDocument> {
+            const uri = vscode.Uri.parse('untitled:test.json');
+            const document = await vscode.workspace.openTextDocument({
+                content,
+                language: 'json'
+            });
+            return document;
+        }
+
+        test('should handle JSON with mixed quote types in strings', async () => {
+            const content = '{"text": "He said \\"Hello\\nWorld\\" to me"}';
+            const document = await createTestDocument(content);
+            
+            const ranges = detector.findStringRanges(document);
+            assert.strictEqual(ranges.length, 2);
+            
+            const textRange = ranges.find(r => r.content.includes('Hello\\nWorld'));
+            assert.ok(textRange, 'Should find string with mixed quotes and newlines');
+            assert.strictEqual(textRange!.hasNewlines, true);
+        });
+
+        test('should handle JSON with backslash at end of string', async () => {
+            const content = '{"path": "C:\\\\folder\\\\file\\\\"}';
+            const document = await createTestDocument(content);
+            
+            const ranges = detector.findStringRanges(document);
+            assert.strictEqual(ranges.length, 2);
+            
+            const pathRange = ranges.find(r => r.content.includes('C:\\\\folder'));
+            assert.ok(pathRange, 'Should find path string');
+            assert.strictEqual(pathRange!.hasNewlines, false);
+        });
+
+        test('should handle JSON with control characters', async () => {
+            const content = '{"data": "Line1\\nLine2\\tTabbed\\rCarriage"}';
+            const document = await createTestDocument(content);
+            
+            const ranges = detector.findStringRanges(document);
+            const dataRange = ranges.find(r => r.content.includes('Line1\\nLine2'));
+            assert.ok(dataRange, 'Should find string with control characters');
+            assert.strictEqual(dataRange!.hasNewlines, true);
+        });
+
+        test('should handle JSON with numeric and boolean values mixed with strings', async () => {
+            const content = `{
+                "id": 123,
+                "active": true,
+                "message": "Status\\nOK",
+                "ratio": 3.14159,
+                "nullable": null,
+                "description": "Multi\\nline\\ndescription"
+            }`;
+            const document = await createTestDocument(content);
+            
+            const ranges = detector.findStringRanges(document);
+            const withNewlines = ranges.filter(r => r.hasNewlines);
+            assert.strictEqual(withNewlines.length, 2); // message and description
+            
+            // Verify specific content
+            const messageRange = ranges.find(r => r.content === 'Status\\nOK');
+            const descRange = ranges.find(r => r.content === 'Multi\\nline\\ndescription');
+            assert.ok(messageRange && descRange, 'Should find both strings with newlines');
+        });
+
+        test('should handle performance metrics correctly', async () => {
+            const content = '{"test": "Hello\\nWorld"}';
+            const document = await createTestDocument(content);
+            
+            // Parse the document to generate metrics
+            detector.findStringRanges(document);
+            
+            const metrics = detector.getPerformanceMetrics();
+            assert.ok(metrics, 'Should have performance metrics');
+            assert.strictEqual(typeof metrics.parseTime, 'number');
+            assert.strictEqual(typeof metrics.stringCount, 'number');
+            assert.strictEqual(typeof metrics.newlineCount, 'number');
+            assert.strictEqual(typeof metrics.fileSize, 'number');
+            assert.strictEqual(typeof metrics.isLargeFile, 'boolean');
+            
+            assert.ok(metrics.stringCount > 0, 'Should count strings');
+            assert.ok(metrics.newlineCount > 0, 'Should count newlines');
+        });
+
+        test('should provide performance recommendations', async () => {
+            const content = '{"test": "Hello\\nWorld"}';
+            const document = await createTestDocument(content);
+            
+            detector.findStringRanges(document);
+            
+            const recommendations = detector.getPerformanceRecommendations();
+            assert.ok(Array.isArray(recommendations), 'Should return array of recommendations');
+            // For small files, there should be no recommendations
+            assert.strictEqual(recommendations.length, 0, 'Small files should have no recommendations');
+        });
+
+        test('should detect large documents correctly', async () => {
+            const content = '{"test": "Hello\\nWorld"}';
+            const document = await createTestDocument(content);
+            
+            detector.findStringRanges(document);
+            
+            const isLarge = detector.isLargeDocument();
+            assert.strictEqual(typeof isLarge, 'boolean');
+            assert.strictEqual(isLarge, false, 'Small document should not be considered large');
         });
     });
 

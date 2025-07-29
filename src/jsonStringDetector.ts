@@ -412,6 +412,9 @@ export class JsonStringDetector {
      * @returns True if the string contains \n sequences
      */
     public containsNewlines(text: string): boolean {
+        if (!text || typeof text !== 'string') {
+            return false;
+        }
         return this.findNewlineEscapeSequences(text).length > 0;
     }
 

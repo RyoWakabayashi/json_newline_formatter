@@ -367,6 +367,138 @@ suite('EditSynchronizer Test Suite', () => {
         });
     });
 
+    suite('Advanced Content Transformation', () => {
+        test('should handle complex escape sequence patterns', () => {
+            const visualContent = 'Line1\nLine2\\nLine3\nLine4';
+            const range = new vscode.Range(new vscode.Position(2, 12), new vscode.Position(2, 30));
+            
+            const actualContent = editSynchronizer.transformVisualContentToActual(testDocument, visualContent, range);
+            assert.strictEqual(actualContent, 'Line1\\nLine2\\nLine3\\nLine4', 'Should convert all line breaks to escape sequences');
+        });
+
+        test('should handle mixed content transformation', () => {
+            const mixedContent = 'Text with\ttabs\nand\rcarriage\nreturns';
+            const range = new vscode.Range(new vscode.Position(2, 12), new vscode.Position(2, 30));
+            
+            const actualContent = editSynchronizer.transformVisualContentToActual(testDocument, mixedContent, range);
+            // Only \n should be converted, other characters should remain
+            assert.ok(actualContent.includes('\\n'), 'Should convert newlines');
+            assert.ok(actualContent.includes('\t'), 'Should preserve tabs');
+            assert.ok(actualContent.includes('\r'), 'Should preserve carriage returns');
+        });
+
+        test('should handle empty content transformation', () => {
+            const emptyContent = '';
+            const range = new vscode.Range(new vscode.Position(2, 12), new vscode.Position(2, 12));
+            
+            const actualContent = editSynchronizer.transformVisualContentToActual(testDocument, emptyContent, range);
+            const visualContent = editSynchronizer.transformActualContentToVisual(testDocument, emptyContent, range);
+            
+            assert.strictEqual(actualContent, '');
+            assert.strictEqual(visualContent, '');
+        });
+
+        test('should handle single character transformations', () => {
+            const singleChar = 'a';
+            const singleNewline = '\n';
+            const range = new vscode.Range(new vscode.Position(2, 12), new vscode.Position(2, 13));
+            
+            const actualChar = editSynchronizer.transformVisualContentToActual(testDocument, singleChar, range);
+            const actualNewline = editSynchronizer.transformVisualContentToActual(testDocument, singleNewline, range);
+            
+            assert.strictEqual(actualChar, 'a', 'Single character should remain unchanged');
+            assert.strictEqual(actualNewline, '\\n', 'Single newline should become escape sequence');
+        });
+    });
+
+    suite('Document State Edge Cases', () => {
+        test('should handle rapid document changes', async () => {
+            decorationManager.applyDecorations(testDocument);
+            
+            // Simulate rapid changes
+            const changes = [
+                { text: 'A', position: new vscode.Position(2, 20) },
+                { text: 'B', position: new vscode.Position(2, 21) },
+                { text: '\n', position: new vscode.Position(2, 22) },
+                { text: 'C', position: new vscode.Position(3, 0) }
+            ];
+            
+            for (const change of changes) {
+                const changeEvent = {
+                    document: testDocument,
+                    contentChanges: [{
+                        range: new vscode.Range(change.position, change.position),
+                        rangeOffset: 0,
+                        rangeLength: 0,
+                        text: change.text
+                    }],
+                    reason: undefined
+                } as vscode.TextDocumentChangeEvent;
+                
+                assert.doesNotThrow(() => {
+                    editSynchronizer.onDidChangeTextDocument(changeEvent);
+                });
+            }
+        });
+
+        test('should handle document version tracking', () => {
+            const initialState = editSynchronizer.getDocumentState(testDocument);
+            const initialVersion = initialState?.version;
+            
+            // Simulate version change
+            const newDocument = { ...testDocument, version: testDocument.version + 1 };
+            const changeEvent = {
+                document: newDocument,
+                contentChanges: [{
+                    range: new vscode.Range(new vscode.Position(1, 0), new vscode.Position(1, 0)),
+                    rangeOffset: 0,
+                    rangeLength: 0,
+                    text: ' '
+                }],
+                reason: undefined
+            } as vscode.TextDocumentChangeEvent;
+
+            editSynchronizer.onDidChangeTextDocument(changeEvent);
+            
+            // State should be updated (we can't easily verify version change in tests)
+            const updatedState = editSynchronizer.getDocumentState(testDocument);
+            assert.ok(updatedState, 'Document state should exist after update');
+        });
+
+        test('should handle concurrent edit operations', () => {
+            decorationManager.applyDecorations(testDocument);
+            
+            // Simulate concurrent edits
+            const changeEvent1 = {
+                document: testDocument,
+                contentChanges: [{
+                    range: new vscode.Range(new vscode.Position(2, 20), new vscode.Position(2, 20)),
+                    rangeOffset: 20,
+                    rangeLength: 0,
+                    text: 'X'
+                }],
+                reason: undefined
+            } as vscode.TextDocumentChangeEvent;
+
+            const changeEvent2 = {
+                document: testDocument,
+                contentChanges: [{
+                    range: new vscode.Range(new vscode.Position(2, 25), new vscode.Position(2, 25)),
+                    rangeOffset: 25,
+                    rangeLength: 0,
+                    text: 'Y'
+                }],
+                reason: undefined
+            } as vscode.TextDocumentChangeEvent;
+
+            // Both should be handled without errors
+            assert.doesNotThrow(() => {
+                editSynchronizer.onDidChangeTextDocument(changeEvent1);
+                editSynchronizer.onDidChangeTextDocument(changeEvent2);
+            });
+        });
+    });
+
     suite('Integration with DecorationManager', () => {
         test('should work with decoration updates', () => {
             decorationManager.applyDecorations(testDocument);
@@ -421,6 +553,36 @@ suite('EditSynchronizer Test Suite', () => {
             assert.ok(visual2 instanceof vscode.Position);
             assert.ok(actual1 instanceof vscode.Position);
             assert.ok(actual2 instanceof vscode.Position);
+        });
+
+        test('should handle decoration manager state changes', () => {
+            decorationManager.applyDecorations(testDocument);
+            
+            // Disable decorations
+            decorationManager.setEnabled(false);
+            
+            const changeEvent = {
+                document: testDocument,
+                contentChanges: [{
+                    range: new vscode.Range(new vscode.Position(2, 20), new vscode.Position(2, 20)),
+                    rangeOffset: 20,
+                    rangeLength: 0,
+                    text: 'test'
+                }],
+                reason: undefined
+            } as vscode.TextDocumentChangeEvent;
+
+            // Should still handle changes even when decorations are disabled
+            assert.doesNotThrow(() => {
+                editSynchronizer.onDidChangeTextDocument(changeEvent);
+            });
+            
+            // Re-enable decorations
+            decorationManager.setEnabled(true);
+            
+            assert.doesNotThrow(() => {
+                editSynchronizer.onDidChangeTextDocument(changeEvent);
+            });
         });
     });
 });

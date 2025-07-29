@@ -76,6 +76,45 @@ suite('DecorationManager Test Suite', () => {
         // We can't directly test the styling properties, but we can ensure the type exists
         assert.strictEqual(typeof state.decorationType, 'object');
     });
+
+    test('should handle multiple enable/disable cycles', () => {
+        // Test multiple cycles
+        for (let i = 0; i < 3; i++) {
+            decorationManager.setEnabled(false);
+            assert.strictEqual(decorationManager.isDecorationEnabled(), false);
+            assert.strictEqual(decorationManager.getActiveDecorationCount(), 0);
+            
+            decorationManager.setEnabled(true);
+            assert.strictEqual(decorationManager.isDecorationEnabled(), true);
+        }
+    });
+
+    test('should handle decoration state queries when disabled', () => {
+        decorationManager.setEnabled(false);
+        
+        const state = decorationManager.getDecorationState();
+        assert.strictEqual(state.isEnabled, false);
+        assert.strictEqual(state.decorations.length, 0);
+        
+        const position = new vscode.Position(0, 0);
+        const decoration = decorationManager.getDecorationAtPosition(position);
+        assert.strictEqual(decoration, null);
+        
+        const range = new vscode.Range(0, 0, 1, 0);
+        const decorations = decorationManager.getDecorationsInRange(range);
+        assert.strictEqual(decorations.length, 0);
+    });
+
+    test('should handle refresh when disabled', () => {
+        decorationManager.setEnabled(false);
+        
+        // Should not throw when refreshing while disabled
+        assert.doesNotThrow(() => {
+            decorationManager.refresh();
+        });
+        
+        assert.strictEqual(decorationManager.getActiveDecorationCount(), 0);
+    });
 });
 
 // Integration tests that require a document

@@ -32,14 +32,14 @@
     - Write tests to verify decoration placement accuracy
     - _Requirements: 1.2, 1.4_
 
-- [ ] 4. Implement edit synchronization system
-  - [ ] 4.1 Create EditSynchronizer for handling text changes
+- [x] 4. Implement edit synchronization system
+  - [x] 4.1 Create EditSynchronizer for handling text changes
     - Write event handlers for onDidChangeTextDocument
     - Implement logic to detect edits in decorated string areas
     - Create position mapping between visual and actual content
     - _Requirements: 2.1, 2.2, 2.3, 2.4_
 
-  - [ ] 4.2 Add bidirectional content transformation
+  - [x] 4.2 Add bidirectional content transformation
     - Implement conversion from visual line breaks to `\n` escape sequences
     - Write logic to handle cursor positioning across transformed content
     - Create comprehensive tests for edit synchronization scenarios

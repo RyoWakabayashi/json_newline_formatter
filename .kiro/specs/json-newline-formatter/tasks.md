@@ -19,14 +19,14 @@
     - Add unit tests for position calculation accuracy
     - _Requirements: 1.1, 1.2_
 
-- [ ] 3. Create decoration system for visual line breaks
-  - [ ] 3.1 Implement DecorationManager class
+- [x] 3. Create decoration system for visual line breaks
+  - [x] 3.1 Implement DecorationManager class
     - Create TextEditorDecorationType for rendering line breaks
     - Write methods to apply and clear decorations based on detected `\n` positions
     - Implement decoration update logic for document changes
     - _Requirements: 1.2, 1.4_
 
-  - [ ] 3.2 Add decoration rendering and styling
+  - [x] 3.2 Add decoration rendering and styling
     - Configure decoration appearance to render `\n` as actual line breaks
     - Ensure decorations don't interfere with syntax highlighting
     - Write tests to verify decoration placement accuracy

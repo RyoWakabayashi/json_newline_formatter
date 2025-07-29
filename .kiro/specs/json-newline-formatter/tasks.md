@@ -6,14 +6,14 @@
   - Create basic extension entry point with activation events
   - _Requirements: All requirements depend on proper project setup_
 
-- [ ] 2. Implement JSON string detection functionality
-  - [ ] 2.1 Create JSON parser utility for string detection
+- [x] 2. Implement JSON string detection functionality
+  - [x] 2.1 Create JSON parser utility for string detection
     - Write JsonStringDetector class with methods to parse JSON and identify string ranges
     - Implement logic to detect `\n` escape sequences within string values
     - Create unit tests for JSON parsing edge cases (nested objects, arrays, malformed JSON)
     - _Requirements: 1.1, 5.1, 5.2, 5.3_
 
-  - [ ] 2.2 Implement position tracking for newline sequences
+  - [x] 2.2 Implement position tracking for newline sequences
     - Write methods to extract exact positions of `\n` sequences in document
     - Create mapping between character positions and VSCode Position objects
     - Add unit tests for position calculation accuracy

@@ -83,11 +83,17 @@ export class EditSynchronizer {
             this.cleanupDocumentState(document);
         });
 
+        // Listen for selection changes to handle copy operations
+        const onDidChangeTextEditorSelection = vscode.window.onDidChangeTextEditorSelection((event) => {
+            this.handleSelectionChange(event);
+        });
+
         this.disposables.push(
             onDidChangeTextDocument,
             onWillSaveDocument,
             onDidOpenTextDocument,
-            onDidCloseTextDocument
+            onDidCloseTextDocument,
+            onDidChangeTextEditorSelection
         );
     }
 
@@ -604,6 +610,257 @@ export class EditSynchronizer {
      */
     public isSynchronizationActive(): boolean {
         return !this.isProcessingEdit;
+    }
+
+    /**
+     * Handle selection changes for copy operations
+     * @param event The selection change event
+     */
+    private handleSelectionChange(event: vscode.TextEditorSelectionChangeEvent): void {
+        const editor = event.textEditor;
+        
+        if (!this.isJsonDocument(editor.document)) {
+            return;
+        }
+
+        // Store the current selection for potential copy operations
+        this.storeSelectionContext(editor, event.selections);
+    }
+
+    /**
+     * Store selection context for clipboard operations
+     * @param editor The text editor
+     * @param selections The current selections
+     */
+    private storeSelectionContext(editor: vscode.TextEditor, selections: readonly vscode.Selection[]): void {
+        // We'll use this to track selections that might be copied
+        // This helps us prepare for clipboard transformations
+        for (const selection of selections) {
+            if (!selection.isEmpty) {
+                const selectedText = editor.document.getText(selection);
+                const isInDecoratedArea = this.isSelectionInDecoratedArea(editor.document, selection);
+                
+                if (isInDecoratedArea) {
+                    // Prepare for potential clipboard transformation
+                    this.prepareClipboardTransformation(editor.document, selection, selectedText);
+                }
+            }
+        }
+    }
+
+    /**
+     * Check if a selection is in a decorated area
+     * @param document The document
+     * @param selection The selection
+     * @returns True if selection is in decorated area
+     */
+    private isSelectionInDecoratedArea(document: vscode.TextDocument, selection: vscode.Selection): boolean {
+        const decorationsInRange = this.decorationManager.getDecorationsInRange(selection);
+        return decorationsInRange.length > 0;
+    }
+
+    /**
+     * Prepare clipboard transformation for decorated content
+     * @param document The document
+     * @param selection The selection
+     * @param selectedText The selected text
+     */
+    private prepareClipboardTransformation(
+        document: vscode.TextDocument, 
+        selection: vscode.Selection, 
+        selectedText: string
+    ): void {
+        // This method prepares the context for clipboard operations
+        // The actual transformation happens during paste operations
+        
+        // Store information about the selection for later use
+        const uri = document.uri.toString();
+        const state = this.documentStates.get(uri);
+        
+        if (state) {
+            // Add selection context to document state
+            (state as any).lastSelection = {
+                range: selection,
+                text: selectedText,
+                isDecorated: true,
+                timestamp: Date.now()
+            };
+        }
+    }
+
+    /**
+     * Handle copy operation for decorated content
+     * @param document The document
+     * @param selection The selection being copied
+     * @returns The transformed text for clipboard
+     */
+    public handleCopyOperation(document: vscode.TextDocument, selection: vscode.Selection): string {
+        const selectedText = document.getText(selection);
+        
+        // Check if the selection contains decorated content
+        const isInDecoratedArea = this.isSelectionInDecoratedArea(document, selection);
+        
+        if (isInDecoratedArea) {
+            // Transform the content for clipboard
+            // When copying decorated content, we want to copy the visual representation
+            return this.transformActualContentToVisual(document, selectedText, selection);
+        }
+        
+        return selectedText;
+    }
+
+    /**
+     * Handle paste operation for decorated content
+     * @param document The document
+     * @param position The position where content is being pasted
+     * @param clipboardText The text from clipboard
+     * @returns The transformed text for pasting
+     */
+    public handlePasteOperation(
+        document: vscode.TextDocument, 
+        position: vscode.Position, 
+        clipboardText: string
+    ): string {
+        // Check if we're pasting into a decorated area
+        const stringRange = this.jsonDetector.getStringRangeAtPosition(document, position);
+        const isInDecoratedArea = stringRange !== null && stringRange.hasNewlines;
+        
+        if (isInDecoratedArea) {
+            // Transform clipboard content for decorated areas
+            // Convert visual line breaks to escape sequences
+            return this.transformVisualContentToActual(document, clipboardText, new vscode.Range(position, position));
+        }
+        
+        return clipboardText;
+    }
+
+    /**
+     * Register clipboard commands for enhanced copy/paste behavior
+     * @param context The extension context
+     */
+    public registerClipboardCommands(context: vscode.ExtensionContext): void {
+        // Register enhanced copy command
+        const copyCommand = vscode.commands.registerCommand('json-newline-formatter.copy', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor || !this.isJsonDocument(editor.document)) {
+                // Fall back to default copy
+                await vscode.commands.executeCommand('editor.action.clipboardCopyAction');
+                return;
+            }
+
+            const selection = editor.selection;
+            if (selection.isEmpty) {
+                // Fall back to default copy
+                await vscode.commands.executeCommand('editor.action.clipboardCopyAction');
+                return;
+            }
+
+            // Handle copy with transformation
+            const transformedText = this.handleCopyOperation(editor.document, selection);
+            await vscode.env.clipboard.writeText(transformedText);
+        });
+
+        // Register enhanced paste command
+        const pasteCommand = vscode.commands.registerCommand('json-newline-formatter.paste', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor || !this.isJsonDocument(editor.document)) {
+                // Fall back to default paste
+                await vscode.commands.executeCommand('editor.action.clipboardPasteAction');
+                return;
+            }
+
+            const clipboardText = await vscode.env.clipboard.readText();
+            const position = editor.selection.active;
+            
+            // Handle paste with transformation
+            const transformedText = this.handlePasteOperation(editor.document, position, clipboardText);
+            
+            // Apply the paste operation
+            const edit = new vscode.WorkspaceEdit();
+            if (editor.selection.isEmpty) {
+                edit.insert(editor.document.uri, position, transformedText);
+            } else {
+                edit.replace(editor.document.uri, editor.selection, transformedText);
+            }
+            
+            await vscode.workspace.applyEdit(edit);
+        });
+
+        context.subscriptions.push(copyCommand, pasteCommand);
+    }
+
+    /**
+     * Test clipboard operations with decorated content
+     * @param document The document to test
+     * @param selection The selection to test
+     * @returns Test results
+     */
+    public testClipboardOperations(document: vscode.TextDocument, selection: vscode.Selection): {
+        originalText: string;
+        copiedText: string;
+        pastedText: string;
+        isTransformed: boolean;
+    } {
+        const originalText = document.getText(selection);
+        const copiedText = this.handleCopyOperation(document, selection);
+        const pastedText = this.handlePasteOperation(document, selection.start, copiedText);
+        
+        return {
+            originalText,
+            copiedText,
+            pastedText,
+            isTransformed: copiedText !== originalText || pastedText !== copiedText
+        };
+    }
+
+    /**
+     * Validate clipboard content for JSON compatibility
+     * @param text The clipboard text
+     * @param targetPosition The position where it will be pasted
+     * @param document The target document
+     * @returns Validation results
+     */
+    public validateClipboardContent(
+        text: string, 
+        targetPosition: vscode.Position, 
+        document: vscode.TextDocument
+    ): {
+        isValid: boolean;
+        needsTransformation: boolean;
+        transformedText: string;
+        errors: string[];
+    } {
+        const errors: string[] = [];
+        let needsTransformation = false;
+        let transformedText = text;
+        
+        // Check if we're pasting into a JSON string
+        const stringRange = this.jsonDetector.getStringRangeAtPosition(document, targetPosition);
+        
+        if (stringRange) {
+            // We're pasting into a JSON string
+            if (text.includes('\n') && !text.includes('\\n')) {
+                // Text contains actual line breaks, needs transformation
+                needsTransformation = true;
+                transformedText = text.replace(/\n/g, '\\n');
+            }
+            
+            // Validate that the transformed text won't break JSON
+            try {
+                // Create a test JSON with the pasted content
+                const testJson = `{"test": "${transformedText}"}`;
+                JSON.parse(testJson);
+            } catch (error) {
+                errors.push('Pasted content would create invalid JSON');
+            }
+        }
+        
+        return {
+            isValid: errors.length === 0,
+            needsTransformation,
+            transformedText,
+            errors
+        };
     }
 
     /**

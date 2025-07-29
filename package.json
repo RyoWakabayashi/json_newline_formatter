@@ -34,7 +34,7 @@
         "command": "json-newline-formatter.toggle",
         "key": "ctrl+shift+j",
         "mac": "cmd+shift+j",
-        "when": "editorTextFocus && resourceExtname == .json"
+        "when": "editorTextFocus && (resourceExtname == .json || resourceExtname == .jsonc)"
       }
     ]
   },

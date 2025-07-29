@@ -64,14 +64,14 @@
     - Write tests for various copy/paste scenarios
     - _Requirements: 3.4_
 
-- [ ] 6. Add user control and toggle functionality
-  - [ ] 6.1 Create toggle command for formatting display
+- [x] 6. Add user control and toggle functionality
+  - [x] 6.1 Create toggle command for formatting display
     - Register VSCode command to enable/disable formatting
     - Implement state management for formatting preference
     - Add command to Command Palette with appropriate keybinding
     - _Requirements: 4.1, 4.2, 4.3_
 
-  - [ ] 6.2 Add status bar indicator and user feedback
+  - [x] 6.2 Add status bar indicator and user feedback
     - Create status bar item showing current formatting state
     - Implement click handler for quick toggle access
     - Add visual feedback when toggling between modes
